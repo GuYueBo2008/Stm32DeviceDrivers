@@ -100,6 +100,19 @@ int uart_init(void);
 int uart_send(const uint8_t *data, uint16_t len, UART_SendMode_t mode);
 
 /**
+ * @brief 以阻塞方式发送字符串（自动计算长度，不含结尾 '\0'）
+ * @param s 以 '\0' 结尾的字符串
+ * @retval 0 成功, -1 参数错误/超长, -3 发送超时
+ */
+int uart_puts(const char *s);
+
+/**
+ * @brief 以阻塞方式发送单个字符
+ * @retval 0 成功, -3 发送超时
+ */
+int uart_putc(char c);
+
+/**
  * @brief 非阻塞读取环形缓冲区
  * @retval 实际读取字节数（0 表示暂无数据）
  */

@@ -205,6 +205,30 @@ uint8_t uart_tx_busy(void)
     return s_tx_busy;
 }
 
+int uart_puts(const char *s)
+{
+    size_t len;
+
+    if (s == NULL) {
+        return -1;
+    }
+
+    len = strlen(s);
+    if (len == 0) {
+        return 0;
+    }
+    if (len > 0xFFFFU) {
+        return -1;
+    }
+
+    return uart_send((const uint8_t *)s, (uint16_t)len, UART_MODE_BLOCK);
+}
+
+int uart_putc(char c)
+{
+    return uart_send((const uint8_t *)&c, 1, UART_MODE_BLOCK);
+}
+
 /* ======================== HAL 回调 ======================== */
 
 /**

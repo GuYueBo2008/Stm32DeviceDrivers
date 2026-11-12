@@ -21,11 +21,6 @@ extern void MX_GPIO_Init(void);
 extern void MX_DMA_Init(void);
 extern void MX_USART1_UART_Init(void);
 
-static int uart_puts(const char *s)
-{
-    return uart_send((const uint8_t *)s, (uint16_t)strlen(s), UART_MODE_BLOCK);
-}
-
 int main(void)
 {
     uint8_t rx_buf[128];
@@ -49,7 +44,6 @@ int main(void)
     /* 阻塞发送：返回即表示已发完，适合启动日志 */
     uart_puts("\r\n===== UART HAL Driver Ready =====\r\n");
     uart_puts("Baud: 115200, 8N1. Type anything, I'll echo it.\r\n");
-
     /* DMA 发送：立即返回，注意 dma_msg 在发完前必须保持有效 */
     uart_send((const uint8_t *)dma_msg, (uint16_t)strlen(dma_msg),
               UART_MODE_DMA);
