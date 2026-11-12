@@ -1,76 +1,79 @@
 /**
  * @file    main.c
- * @brief   UART 驱动使用示例 —— 跑一个简单的 echo 程序
+ * @brief   UART 驱动使用示例（CubeMX + HAL 工程）—— echo 回显
  *
  * 接线:
- *    PA9  (USART1_TX)  -> USB-TTL 的 RX
- *    PA10 (USART1_RX)  <- USB-TTL 的 TX
- *    GND              -> GND   (必须共地！)
+ *    PA9  (USART1_TX) -> USB-TTL 的 RX
+ *    PA10 (USART1_RX) <- USB-TTL 的 TX
+ *    GND              -> GND（必须共地）
  *
- * 功能:
- *    上电后打印一条欢迎信息；PC 端任意发数据，板子会原样回显。
+ * @note 本文件是完整示例。若放进 CubeMX 生成的工程，只需在 USER CODE 区段
+ *       补上 include 与 uart_init()/收发调用，其余生成代码保持不变。
  */
 
+#include "main.h"
 #include "uart.h"
 #include <string.h>
 
-/* 简单的毫秒级延时（替换为工程里已有的延时函数，比如 SysTick） */
-static void delay_ms(volatile uint32_t ms)
-{
-    volatile uint32_t i, j;
-    for (i = 0; i < ms; i++)
-        for (j = 0; j < 16000; j++);
-}
+/* CubeMX 生成的初始化函数声明（生成代码中通常在 main.h / usart.h 里） */
+extern void SystemClock_Config(void);
+extern void MX_GPIO_Init(void);
+extern void MX_DMA_Init(void);
+extern void MX_USART1_UART_Init(void);
 
-/* 用阻塞模式发送字符串 —— 最省事的封装 */
 static int uart_puts(const char *s)
 {
     return uart_send((const uint8_t *)s, (uint16_t)strlen(s), UART_MODE_BLOCK);
-}
-
-/* 用阻塞模式发送单个字符 */
-static int uart_putc(char c)
-{
-    return uart_send((const uint8_t *)&c, 1, UART_MODE_BLOCK);
 }
 
 int main(void)
 {
     uint8_t rx_buf[128];
     uint16_t n;
+    const char *dma_msg = "[DMA] hello from STM32F407\r\n";
 
-    /* 1. 初始化 UART (GPIO + USART + DMA + NVIC) */
-    uart_init();
+    HAL_Init();
+    SystemClock_Config();
 
-    /* 2. 启动信息 —— 阻塞模式发，保证打印完整 */
-    uart_puts("\r\n===== UART DMA Driver Ready =====\r\n");
+    MX_GPIO_Init();
+    MX_DMA_Init();              /* 注意：DMA 必须先于 USART 初始化 */
+    MX_USART1_UART_Init();
+
+    /* 启动 DMA + IDLE 空闲中断接收 */
+    if (uart_init() != 0) {
+        /* 启动失败：通常是 CubeMX 里没开 DMA / USART1 全局中断 */
+        while (1) {
+        }
+    }
+
+    /* 阻塞发送：返回即表示已发完，适合启动日志 */
+    uart_puts("\r\n===== UART HAL Driver Ready =====\r\n");
     uart_puts("Baud: 115200, 8N1. Type anything, I'll echo it.\r\n");
 
-    /* 3. 用 DMA 模式发一条 —— 立即返回，不等发完
-     *    uart_tx_busy() 可用于查询发送是否结束 */
-    const char *dma_msg = "[DMA] hello from STM32F407\r\n";
-    uart_send((const uint8_t *)dma_msg, (uint16_t)strlen(dma_msg), UART_MODE_DMA);
+    /* DMA 发送：立即返回，注意 dma_msg 在发完前必须保持有效 */
+    uart_send((const uint8_t *)dma_msg, (uint16_t)strlen(dma_msg),
+              UART_MODE_DMA);
 
-    /* 主循环: 从环形缓冲区取数据 -> 回显 */
     while (1) {
-        /* 带超时读取，避免死循环空转 */
-        n = uart_read_timeout(rx_buf, sizeof(rx_buf), 100);
-
+        /* 从环形缓冲区取一帧（50ms 超时） */
+        n = uart_read_timeout(rx_buf, sizeof(rx_buf), 50);
         if (n > 0) {
-            /* 直接用阻塞模式回显 —— 简单可靠 */
+            /* 回显：阻塞模式，简单可靠 */
             uart_send(rx_buf, n, UART_MODE_BLOCK);
-
-            /* 顺便打印个计数，演示 uart_send DMA + 查询 busy */
-            static uint32_t echo_cnt = 0;
-            echo_cnt++;
-            if (echo_cnt % 10 == 0) {
-                uart_puts("\r\n[echo count: ]");
-                /* 这里可以换成 printf("%lu", echo_cnt)，
-                 * 工程若无重定向则自行写一个整数转字符串 */
-            }
         }
 
-        /* 空闲时做点别的也行，喂狗等 */
-        delay_ms(1);
+        /* 需要等 DMA 发完再做下一步时可以这样查询：
+         *   while (uart_tx_busy()) { }
+         */
+    }
+}
+
+/**
+ * @brief 若工程里没有 CubeMX 生成的错误处理，可保留此实现
+ */
+void Error_Handler(void)
+{
+    __disable_irq();
+    while (1) {
     }
 }
