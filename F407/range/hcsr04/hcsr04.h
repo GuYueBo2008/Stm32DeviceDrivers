@@ -39,6 +39,8 @@ extern "C" {
 /* ------- 微秒定时器句柄 (CubeMX 生成的定时器句柄) ------- */
 /* 该定时器需配置为：计数频率 = 1 MHz (即每 tick = 1 us)   */
 #define HCSR04_TIMER_HANDLE     htim2
+/* 驱动自己声明 extern, 保证编译过; 若外部已声明过也不冲突 (extern 允许重复) */
+extern TIM_HandleTypeDef HCSR04_TIMER_HANDLE;
 
 /* ------- ECHO 对应的定时器通道 ------- */
 /* 可选: TIM_CHANNEL_1 / TIM_CHANNEL_2 / TIM_CHANNEL_3 / TIM_CHANNEL_4 */
@@ -48,7 +50,12 @@ extern "C" {
 /* 若启用 DMA 捕获, 在 CubeMX 中为对应通道配置 DMA Normal 模式,
    然后把这里填入 DMA 句柄 (例如 hdma_tim2_ch2)                */
 #define HCSR04_USE_DMA          0
-#define HCSR04_DMA_HANDLE       0
+#if HCSR04_USE_DMA
+  #define HCSR04_DMA_HANDLE     hdma_tim2_ch2
+  extern DMA_HandleTypeDef HCSR04_DMA_HANDLE;
+#else
+  #define HCSR04_DMA_HANDLE     0
+#endif
 
 /* ------- 声速系数 & 测量量程 ------- */
 /* 声速按 340 m/s, 往返 => 每 cm 需要 2e-2 / 340 s = 58.82 us    */
